@@ -1,46 +1,35 @@
 package controllers
 
-import java.util
 import javax.inject._
 
+import api.datastore.datomic
+import models.svc.{Entity, entityReads}
 import play.api.libs.json._
 import play.api.mvc._
 
-import scala.collection.JavaConverters._
-import play.api.libs.json.Reads._
-import play.api.libs.functional.syntax._
-import api.datastore.datomic
-import play.Logger
-import play.api.mvc._
-import clojure.lang.PersistentArrayMap
-import models.svc.SvcEntity
-
 @Singleton
-class SvcController @Inject()(cc: ControllerComponents) extends AbstractController(cc) {
+class SvcController @Inject()(cc: ControllerComponents)
+
+  extends AbstractController(cc) {
 
   val appOrg = "acme"
   val appUser = "thomas"
+  val appVersion = "1"
 
   def save(): Action[AnyContent] = Action { implicit request: Request[AnyContent] =>
 
     request.body.asJson.fold(BadRequest("Missing Body"))(jsVal => {
 
-      jsVal.validate(svcEntityReads).fold(
-
+      jsVal.validate(entityReads).fold(
         (errors: Seq[(JsPath, Seq[JsonValidationError])]) => {
+          BadRequest(errors.toString())
+        }, (entity: Entity) => {
 
-          BadRequest("Missing Body")
+          val dres = datomic.makeTuple(entity, s"${appOrg}.${appUser}")
+          Ok(dres.toString)
 
-        }, (entity: SvcEntity) => {
-
-          val x: (util.List[_], Any) => Unit = datomic.transxSchema
-
-          val res: Object = datomic.transxSchema(entity.properties.asJava, entity)
-
-          print(res)
-
-          Ok("got it!")
         })
     })
   }
+
 }

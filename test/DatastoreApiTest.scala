@@ -1,39 +1,30 @@
-import java.util
+import java.lang
 
-import org.scalatest.FunSuite
 import api.datastore.datomic
-import clojure.lang.{IPersistentMap, IRecord, ISeq, RT}
-
-import scala.collection.JavaConverters._
-import scala.beans.BeanProperty
-
-sealed case class Property(@BeanProperty name: String,
-                           @BeanProperty dataType: String) extends IRecord
-
-sealed case class Entity(@BeanProperty name: String,
-                         @BeanProperty properties: Seq[Property]) extends IRecord
+import models.svc.{DataType, Entity, Property}
+import org.scalatest.FunSuite
 
 class ClojureApiTest extends FunSuite {
 
-  //implicit def asClojureISeq[T](xs: Seq[T]): ISeq = RT.seq(xs.asJava)
+  val properties: Seq[Property] = Seq(
+    Property("color", DataType.string),
+    Property("season", DataType.long),
+    Property("origin", DataType.string)
+  )
 
-  def invokeClojureFunc[T, R](fn: T => R, args: T): R = {
-    fn.apply(args)
+  val entity = Entity("fruits", properties)
+
+  test("Unpack Entity") {
+
+    val r1 = datomic.unpack(entity)
+    println(r1)
+    assert(r1 != null)
+
   }
 
-  test("Call unpack") {
-
-    val properties = Seq(
-      Property("color", "string"),
-      Property("season", "string"),
-      Property("origin", "string")
-    )
-
-    val entity = Entity("fruits", properties)
-    val r1: IPersistentMap = datomic.unpack(entity)
-
-    print(r1)
-
+  test("Unpack Properties") {
+    val r1: lang.Iterable[_] = datomic.unpack(properties)
+    println(r1)
     assert(r1 != null)
   }
 }

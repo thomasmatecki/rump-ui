@@ -8,21 +8,19 @@
            (clojure.lang IPersistentMap IRecord ISeq)
            (scala.collection Seq AbstractSeq JavaConverters)
            (scala.collection.immutable List)
-           (scala.collection JavaConversions))
+           (scala.collection JavaConversions)
+           (scala Enumeration)
+           (models.svc JsonEnum))
 
   (:gen-class
-    :name api.datastore.datomic
-    :methods [#^{:static true} [transxSchema [Object Object] Object]
-              #^{:static true} [unpack
+    :name ^{javax.inject.Singleton true} api.datastore.datomic
+    :methods [#^{:static true} [unpack
                                 [Object]
-                                clojure.lang.IPersistentMap]
-              #^{:static true} [toClojure
-                                [scala.collection.Seq]
-                                Object]
-              #^{:static true} [retVal
-                                [Object]
-                                String]
+                                java.lang.Iterable]
 
+              #^{:static true} [makeTuple
+                                [clojure.lang.IRecord java.lang.String]
+                                java.lang.Object]
               ]))
 (def conn
   (<!! (client/connect
@@ -34,46 +32,30 @@
           :service    "peer-server"
           :access-key "myaccesskey"})))
 
-(def movie-schema [{:db/ident       :movie/title
-                    :db/valueType   :db.type/string
-                    :db/cardinality :db.cardinality/one
-                    :db/doc         "The title of the movie"}
 
-                   {:db/ident       :movie/genre
-                    :db/valueType   :db.type/string
-                    :db/cardinality :db.cardinality/one
-                    :db/doc         "The genre of the movie"}
+;(def movie-schema [{:db/ident       :movie/title
+;                    :db/valueType   :db.type/string
+;                    :db/cardinality :db.cardinality/one
+;                      :db/doc         "The title of the movie"}
+;
+;                   {:db/ident       :movie/genre
+;                    :db/valueType   :db.type/string
+;                    :db/cardinality :db.cardinality/one
+;                    :db/doc         "The genre of the movie"}
+;
+;                   {:db/ident       :movie/release-year
+;                    :db/valueType   :db.type/long
+;                    :db/cardinality :db.cardinality/one
+;                    :db/doc         "The year the movie was released in theaters"}])
 
-                   {:db/ident       :movie/release-year
-                    :db/valueType   :db.type/long
-                    :db/cardinality :db.cardinality/one
-                    :db/doc         "The year the movie was released in theaters"}])
-
-
-(defn inner
-  "docstring"
-  [arg]
-  (.println System/out
-            (if (instance? AbstractSeq arg)
-              "Some Sequence"
-              (bean arg))))
 
 (defn map-values
   "docstring"
   [f m]
   (into {} (for [[k v] m] [k (f v)])))
 
-(defn scala-seq->vec
-  "Convert a Scala Seq to a vector.
-  *Arguments*:
-    * `scala-seq`: a Scala Seq
-  *Returns*:
-    A PersistentVector with the contents of `scala-seq`."
-  [scala-seq]
 
-  )
-
-(defn -toClojure
+(defn toClojure
   "Convert a Scala Iterable to A Java Iterable, which is
   implemented by clojure.lang.ASeq"
   [scala-seq]
@@ -81,22 +63,33 @@
 
 (defn -unpack
   "docstring"
-  [v0]
+  [record]
+
   (cond
-    (instance? IRecord v0) (-unpack (bean v0))
-    (map? v0) (map-values -unpack v0)
-    (instance? AbstractSeq v0) (-unpack (-toClojure v0))
-    (sequential? v0) (map -unpack v0)
-    :else v0)
+    (instance? IRecord record) (-unpack (bean record))
+    (map? record) (map-values -unpack record)
+    (instance? AbstractSeq record) (-unpack (toClojure record))
+    (sequential? record) (map -unpack record)
+    :else (.toString record))
   )
 
-(defn -transxSchema
-  "Transact Service Schema in Datomic"
-  [properties schema]
+(defn -makeTuple
+  "docstring"
+  [entityRec prefix]
 
-  (let [schema-map (bean schema)]
-    (.println System/out schema-map))
+  (<!! (client/transact
+         conn
+         {:tx-data (let
+                     [entityM (-unpack entityRec)
+                      tuple (:name entityM)
+                      properties (:properties entityM)]
+                     (map
+                       (fn [m]
+                         {:db/ident       (keyword (str prefix "." tuple "/" (:name m)))
+                          :db/valueType   (keyword (str "db.type/" (:dataType m)))
+                          :db/cardinality :db.cardinality/one
+                          :db/doc         ""})
+                       properties))})
 
-  (.println System/out (.properties schema))
-
+       )
   )
