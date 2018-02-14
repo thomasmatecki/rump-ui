@@ -4,6 +4,7 @@ name := """rump-ui"""
 organization := "com.rump"
 
 version := "1.0-SNAPSHOT"
+
 val compileClojure = taskKey[Unit]("Compile Clojure Sources")
 
 lazy val root = (project in file(".")).enablePlugins(PlayScala) settings (

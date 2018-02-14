@@ -5,11 +5,13 @@
 
 # An example controller showing a sample home page
 GET         /                     controllers.HomeController.index
+GET         /app                  controllers.HomeController.index
 GET         /login                controllers.HomeController.index
 GET         /signup               controllers.HomeController.index
 
 POST        /auth/login           controllers.AuthenticationController.login
 POST        /auth/signup          controllers.AuthenticationController.signup
+GET         /auth/logout          controllers.AuthenticationController.logout
 
 POST        /api/SvcEntity        controllers.SvcController.save
 

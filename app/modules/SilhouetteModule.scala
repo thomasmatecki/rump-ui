@@ -20,7 +20,7 @@ import play.api.Configuration
 import play.api.mvc.CookieHeaderEncoding
 
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.duration._
+
 
 class SilhouetteModule extends AbstractModule with ScalaModule {
 
@@ -70,6 +70,33 @@ class SilhouetteModule extends AbstractModule with ScalaModule {
       config, None, authenticatorEncoder, idGenerator, clock
     )
   }
+
+  /*@Provides
+    def provideAuthenticatorService(@Named("authenticator-signer") signer: Signer,
+                                    @Named("authenticator-crypter") crypter: Crypter,
+                                    cookieHeaderEncoding: CookieHeaderEncoding,
+                                    fingerprintGenerator: FingerprintGenerator,
+                                    idGenerator: IDGenerator,
+                                    configuration: Configuration,
+                                    clock: Clock): AuthenticatorService[CookieAuthenticator] = {
+
+      val config = CookieAuthenticatorSettings(
+        cookieName = "id",
+        cookiePath = "/",
+        cookieDomain = None,
+        secureCookie = false,
+        httpOnlyCookie = false,
+        useFingerprinting = true,
+        cookieMaxAge = None,
+        authenticatorIdleTimeout = None,
+        authenticatorExpiry = 12 hours
+      )
+
+      val authenticatorEncoder = new CrypterAuthenticatorEncoder(crypter)
+
+      new CookieAuthenticatorService(config, None, signer, cookieHeaderEncoding, authenticatorEncoder, fingerprintGenerator, idGenerator, clock)
+    }
+  */
 
 
   @Provides

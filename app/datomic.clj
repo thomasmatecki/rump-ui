@@ -9,8 +9,7 @@
            (scala.collection Seq AbstractSeq JavaConverters)
            (scala.collection.immutable List)
            (scala.collection JavaConversions)
-           (scala Enumeration)
-           (models.svc JsonEnum))
+           (scala Enumeration))
 
   (:gen-class
     :name ^{javax.inject.Singleton true} api.datastore.datomic

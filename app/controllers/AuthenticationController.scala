@@ -2,75 +2,87 @@ package controllers
 
 import javax.inject.Inject
 
+import actions.JsonBuilder
 import auth.{DefaultEnv, UserService}
-import actions.JsonAction
-import models.user.credentialsReads
+import com.mohiva.play.silhouette.api.actions.{SecuredRequest, UserAwareActionBuilder}
 import com.mohiva.play.silhouette.api.{LoginInfo, Silhouette}
-import com.mohiva.play.silhouette.api.services.{AuthenticatorResult, AuthenticatorService}
-import com.mohiva.play.silhouette.impl.providers.CredentialsProvider
+import com.mohiva.play.silhouette.api.services.AuthenticatorResult
 import com.mohiva.play.silhouette.api.util.Credentials
-import com.mohiva.play.silhouette.impl.authenticators.JWTAuthenticator
-import play.api.libs.json.{JsPath, JsonValidationError}
-
-import scala.concurrent.ExecutionContext.Implicits.global
-import play.api.mvc._
+import com.mohiva.play.silhouette.impl.providers.CredentialsProvider
+import models.user.{UserSignup, credentialsReads}
 import play.api.Logger
+import play.api.libs.json._
+import play.api.mvc._
 
 import scala.concurrent.Future
 
 class AuthenticationController @Inject()(cc: ControllerComponents,
-                                         auth: Silhouette[DefaultEnv],
+                                         val auth: Silhouette[DefaultEnv],
                                          userService: UserService,
                                          credentialsProvider: CredentialsProvider)
-  extends AbstractController(cc) {
+  extends AbstractController(cc)
+    with JsonBuilder {
 
-  val authService: AuthenticatorService[JWTAuthenticator] = auth.env.authenticatorService
+  private val authService = auth.env.authenticatorService
 
-  def authenticate(implicit request: Request[AnyContent]): Future[Result] = {
+  private def signin(result: Result)(implicit request: Request[JsValue]): PartialFunction[LoginInfo, Future[Result]] = {
 
-    request.body.asJson.fold(
+    case loginInfo: LoginInfo =>
 
-      Future.successful(BadRequest("No Body")))(jsVal => {
+      Logger.info(s"Signing In User ${loginInfo.providerID}:${loginInfo.providerKey}")
 
-      jsVal.validate(credentialsReads).fold(
-        (errors: Seq[(JsPath, Seq[JsonValidationError])]) => {
-          Future.successful(BadRequest(
-
-            errors.map { case (path, validationErrors: Seq[JsonValidationError]) =>
-              s"$path: ${
-                validationErrors.map(_.message).reduce[String] {
-                  case (s0, s1) => s"$s0, $s1"
-                }
-              }"
-            }.reduce[String] { case (s0, s1) => s"$s0\n$s1" }
-          ))
-        },
-
-        (credentials: Credentials) => {
-
-          credentialsProvider.authenticate(credentials)
-            .flatMap(authService.create)
-            .flatMap(authService.init)
-            .flatMap(authService.embed(_, Ok("")))
-
-        }).recover { case e: Exception =>
-
-        Logger.info(e.getMessage)
-
-        NotFound(e.getMessage)
-      }
-    })
+      authService.create(loginInfo)
+        .flatMap(authService.init)
+        .flatMap(authService.embed(_, result))
   }
 
+  def signup(): Action[JsValue] = JsonAction[UserSignup] {
 
+    implicit request =>
 
-  def login(): Action[AnyContent] = auth.UnsecuredAction.async {
-    implicit request: Request[AnyContent] => authenticate(request)
+      signup: UserSignup =>
+
+        lazy val loginInfo = LoginInfo(CredentialsProvider.ID, signup.email)
+        userService.retrieve(loginInfo)
+          .flatMap(_.fold {
+
+            Logger.info(s"Signing Up User ${signup.email}")
+            userService.create(signup).flatMap(signin(Ok))
+
+          } {
+            _ => Future.successful(Redirect(routes.HomeController.index()))
+          })
   }
-/*  def signup(): Action[AnyContent] = auth.UnsecuredAction.async {
-    implicit request: Request[AnyContent] =>
 
+  def login(): Action[JsValue] = JsonAction[Credentials] {
 
-  }*/
+    implicit request: Request[JsValue] =>
+
+      (credentials: Credentials) =>
+        credentialsProvider.authenticate(credentials)
+          .flatMap(signin(Ok))
+          .recover { case e: Exception =>
+            Logger.info(e.getMessage)
+            AuthenticatorResult(NotFound)
+          }
+  }
+
+  def foo: Action[JsValue] = JsonSecInvoke[Credentials] {
+
+    implicit request: Request[JsValue] =>
+
+      (credentials: Credentials) =>
+        credentialsProvider.authenticate(credentials)
+          .flatMap(signin(Ok))
+          .recover { case e: Exception =>
+            Logger.info(e.getMessage)
+            AuthenticatorResult(NotFound)
+          }
+  }
+
+  def logout(): Action[AnyContent] = auth.SecuredAction.async {
+    implicit request: SecuredRequest[DefaultEnv, AnyContent] =>
+      authService.discard(request.authenticator, Redirect("/login"))
+  }
 
 }

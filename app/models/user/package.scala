@@ -10,14 +10,14 @@ import slick.lifted.ProvenShape.proveShapeOf
 
 package object user {
 
-  implicit val credentialsReads: Reads[Credentials] = Json.reads[Credentials]
-
   case class UserSignup(firstName: String,
                         lastName: String,
                         email: String,
                         credentials: Credentials) {
   }
 
+  implicit val credentialsReads: Reads[Credentials] = Json.reads[Credentials]
+  implicit val userSignupReads: Reads[UserSignup] = Json.reads[UserSignup]
 
   case class User(id: Option[Int],
                   firstName: Option[String],
